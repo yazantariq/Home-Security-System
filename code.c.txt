@@ -1,0 +1,265 @@
+void buzzerOn(void);
+char keypad_scanner(void);
+char switch_press_scan(void);
+void open();
+void close();
+void ADCInit(void);
+unsigned int ADC_read0(void);
+unsigned int ADC_read1(void);
+unsigned int ADC_read2(void);
+unsigned int ADC_read3(void);
+unsigned int ADC_read4(void);
+unsigned int ADC_read5(void);
+unsigned int ADC_read6(void);
+void CCPPWM_init(void);
+void motor1(unsigned char speed);
+void msDelay(unsigned int ms);
+
+sbit LCD_D4 at RD1_bit;
+sbit LCD_D5 at RD2_bit;
+sbit LCD_D6 at RD3_bit;
+sbit LCD_D7 at RD4_bit;
+sbit LCD_RS at RD5_bit;
+sbit LCD_EN at RD6_bit;
+
+sbit LCD_D4_Direction at TRISD1_bit;
+sbit LCD_D5_Direction at TRISD2_bit;
+sbit LCD_D6_Direction at TRISD3_bit;
+sbit LCD_D7_Direction at TRISD4_bit;
+sbit LCD_RS_Direction at TRISD5_bit;
+sbit LCD_EN_Direction at TRISD6_bit;
+
+bit security;
+unsigned int tick;
+void interrupt(){
+if (INTCON & 0x04) { // TMRO overflow
+    TMR0 = 248;
+    tick= tick+1;
+    INTCON = INTCON & 0xFB;
+    }
+}
+void main(void){
+ CCPPWM_init();
+ TRISB = 0xF0;
+ TRISA = 0XFF;
+ TRISE = 0XFF;
+ //INTCON = 0xA0;//enable global and tmr0 overflow interrupts
+ OPTION_REG = 0x07;//Use internal clock Fosc/4 with a prescaler of 256
+// Fosc=8MHz==> FTMR0 = 8MHz/4 = 2MHz, TMR0 will inc every 1/2MHz * prescaler
+//0.5uS* 256 = 128uS (per increment)
+//enable pull resistor on portb for the keypad
+TMR0=248;
+
+ TRISC = 0x00;
+ TRISD = 0X01;
+ PORTC = 0X00;
+ security = 1;
+ ADCInit();
+ Delay_ms(1000);
+
+ Lcd_Init();                        // Initialize LCD
+ Lcd_Cmd(_LCD_CLEAR);               // Clear display
+ Lcd_Cmd(_LCD_CURSOR_OFF);          // Cursor off
+
+while(1){
+   unsigned char pass[4]="";
+   unsigned char c;
+
+   if((PORTD & 0X01) == 0X01){//PORTD 00000001
+   Lcd_Cmd(_LCD_CLEAR);
+      Lcd_out(1,1,"Password:");
+   for(c=0;c<4;c++){
+     pass[c] = switch_press_scan();
+     Lcd_out(2,c+1,"*");
+     msDelay(100);
+     }
+
+  if(pass[0] != '1' || pass[1] != '2' || pass[2] != '3' || pass[3] != '4'){
+             if(pass[0] != '*' || pass[1] != '*' || pass[2] != '*' || pass[3] != '*'){
+      security = 1;
+      Lcd_out(1,1,"Wrong");
+      Lcd_out(2,1,"Password");
+      Lcd_Cmd(_LCD_CLEAR);
+
+   }
+   else{     security =1;
+             
+             Lcd_Cmd(_LCD_CLEAR);
+             Lcd_out(1,1,"Security On");
+             close();
+		}
+             }
+   else{
+      security =0;
+      open();
+   }
+   }
+   if(security == 1){
+    PORTC = PORTC | 0b00011011;
+    msDelay(100);
+    if( ADC_Read5() > 600){
+      buzzerOn();
+    }
+    if( ADC_Read3() > 100){
+      buzzerOn();
+     }
+    if( ADC_Read2() > 100){
+      buzzerOn();
+     }
+    if( ADC_Read1() > 100){
+      buzzerOn();
+     }
+
+    if( ADC_Read0() > 100){
+      buzzerOn();
+    }
+    }
+   else{
+   PORTC = PORTC & 0XE4;
+   Lcd_Cmd(_LCD_CLEAR);
+   Lcd_out(1,1,"Welcome");
+   Lcd_out(2,1,"Home");   }
+
+   /*if( ADC_Read6() < 100){
+      buzzerOn();
+    }*/
+}
+}
+void ADCInit(void){
+     ADCON1 = 0xC0; // right justified, all channels are analog
+     ADCON0 = 0x41; //prescale 16, channel 0, dont start conversion, power on ATD
+}
+unsigned int ADC_read0(void){
+ADCON0 = 0x41;
+ADCON0 = ADCON0 | 0x04;     //AN0
+     while((ADCON0 & 0x04)); // wait until the GO/DONE bit is reset, the ATD reading is ready
+return ((ADRESH<<8)|(ADRESL));
+ }
+
+unsigned int ADC_read1(void){
+ADCON0= 0x49;        //AN1
+ADCON0 = ADCON0 | 0x04;
+     while((ADCON0 & 0x04)); // wait until the GO/DONE bit is reset, the ATD reading is ready
+return ((ADRESH<<8)|(ADRESL));
+ }
+
+unsigned int ADC_read2(void){
+ADCON0= 0x51;        //AN2
+ADCON0 = ADCON0 | 0x04;
+     while((ADCON0 & 0x04)); // wait until the GO/DONE bit is reset, the ATD reading is ready
+return ((ADRESH<<8)|(ADRESL));
+ }
+
+unsigned int ADC_read3(void){
+ADCON0= 0x59;        //AN3
+ADCON0 = ADCON0 | 0x04;
+     while((ADCON0 & 0x04)); // wait until the GO/DONE bit is reset, the ATD reading is ready
+return ((ADRESH<<8)|(ADRESL));
+ }
+
+unsigned int ADC_read4(void){
+ADCON0= 0x61;        //AN4
+ADCON0 = ADCON0 | 0x04;
+     while((ADCON0 & 0x04)); // wait until the GO/DONE bit is reset, the ATD reading is ready
+return ((ADRESH<<8)|(ADRESL));
+ }
+
+unsigned int ADC_read5(void){
+ADCON0= 0x69;        //AN5
+ADCON0 = ADCON0 | 0x04;
+     while((ADCON0 & 0x04)); // wait until the GO/DONE bit is reset, the ATD reading is ready
+return ((ADRESH<<8)|(ADRESL));
+ }
+unsigned int ADC_read6(void){
+ADCON0= 0x71;        //AN6
+ADCON0 = ADCON0 | 0x04;
+     while((ADCON0 & 0x04)); // wait until the GO/DONE bit is reset, the ATD reading is ready
+return ((ADRESH<<8)|(ADRESL));
+ }
+
+
+
+
+char switch_press_scan(void)                       // Get key from user
+{
+            char key = 'n';              // Assume no key pressed
+            while(key=='n')              // Wait untill a key is pressed
+            key = keypad_scanner();   // Scan the keys again and again
+            return key;                  //when key pressed then return its value
+}
+
+char keypad_scanner(void)
+{
+
+            PORTB = PORTB & 0XFE;PORTB = PORTB | 0X0E;
+            if ((PORTB >> 4) & 1 == 0) { msDelay(100); while ((PORTB >> 4) & 1 == 0); return '1'; }
+            if ((PORTB >> 5) & 1 == 0) { msDelay(100); while ((PORTB >> 5) & 1 == 0); return '2'; }
+            if ((PORTB >> 6) & 1 == 0) { msDelay(100); while ((PORTB >> 6) & 1 == 0); return '3'; }
+            if ((PORTB >> 7) & 1 == 0) { msDelay(100); while ((PORTB >> 7) & 1 == 0); return 'A'; }
+
+            PORTB = PORTB & 0XFD;PORTB=PORTB | 0X0D;
+            if ((PORTB >> 4) & 1 == 0) { msDelay(100); while ((PORTB >> 4) & 1 == 0); return '4'; }
+            if ((PORTB >> 5) & 1 == 0) { msDelay(100); while ((PORTB >> 5) & 1 == 0); return '5'; }
+            if ((PORTB >> 6) & 1 == 0) { msDelay(100); while ((PORTB >> 6) & 1 == 0); return '6'; }
+            if ((PORTB >> 7) & 1 == 0) { msDelay(100); while ((PORTB >> 7) & 1 == 0); return 'B'; }
+
+            PORTB = PORTB & 0XFB; PORTB = PORTB | 0X0B;
+            if ((PORTB >> 4) & 1 == 0) { msDelay(100); while ((PORTB >> 4) & 1 == 0); return '7'; }
+            if ((PORTB >> 5) & 1 == 0) { msDelay(100); while ((PORTB >> 5) & 1 == 0); return '8'; }
+            if ((PORTB >> 6) & 1 == 0) { msDelay(100); while ((PORTB >> 6) & 1 == 0); return '9'; }
+            if ((PORTB >> 7) & 1 == 0) { msDelay(100); while ((PORTB >> 7) & 1 == 0); return 'C'; }
+
+            PORTB = PORTB & 0XF7; PORTB = PORTB | 0X07;
+            if ((PORTB >> 4) & 1 == 0) { msDelay(100); while ((PORTB >> 4) & 1 == 0); return '*'; }
+            if ((PORTB >> 5) & 1 == 0) { msDelay(100); while ((PORTB >> 5) & 1 == 0); return '0'; }
+            if ((PORTB >> 6) & 1 == 0) { msDelay(100); while ((PORTB >> 6) & 1 == 0); return '#'; }
+            if ((PORTB >> 7) & 1 == 0) { msDelay(100); while ((PORTB >> 7) & 1 == 0); return 'D'; }
+
+
+    return 'n';
+}
+
+
+void buzzerOn(){
+char i=5;
+while(i>0){
+  PORTC = PORTC | 0X20;//RC5 ON
+  msDelay(1000);
+  PORTC = PORTC & 0XDF;    //RC5 OFF
+  msDelay(1000);
+  i--;
+  }
+}
+void close(){
+ motor1(50);
+ PORTC = PORTC & 0xBF;//RC6 OFF
+ PORTC = PORTC | 0x80; //RC7 ON
+ msDelay(11000);
+ PORTC = PORTC & 0x3F; //RC6 & RC7 OFF
+}
+
+void open(){
+motor1(50);
+PORTC = PORTC | 0x40; //RC6 ON
+PORTC = PORTC & 0x7F; //RC7 OFF
+msDelay(11000);
+PORTC = PORTC & 0x3F; //RC6 & RC7 OFF
+}
+
+void CCPPWM_init(void){ //Configure CCP1 and CCP2 at 2ms period with 50% duty cycle
+  T2CON = 0x07;//enable Timer2 at Fosc/4 with 1:16 prescaler (8 uS percount 2000uS to count 250 counts)
+  CCP1CON = 0x0C;//enable PWM for CCP1
+  PR2 = 250;// 250 counts =8uS *250 =2ms period
+  TRISC = 0x00;
+  CCPR1L= 125;
+  CCPR2L= 125;
+}
+void motor1(unsigned char speed){ //speed 0-250
+       CCPR1L=speed;
+
+}
+
+void msDelay(unsigned int ms) {
+  tick = 0;
+  while (tick < ms);
+}
